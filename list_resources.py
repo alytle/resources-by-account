@@ -110,7 +110,6 @@ def main():
     for account in accounts:
         account_id = account['Id']
         account_name = account['Name']
-        account_email = account['Email']
 
         results['accounts'][account_id] = account
         results['ec2'][account_id] = {}
