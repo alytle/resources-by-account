@@ -1,8 +1,9 @@
 import logging
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoRegionError
 import csv
 import argparse
+import os
 
 
 SESSION_NAME = 'ListResources'
@@ -123,11 +124,19 @@ def main():
             continue
 
         # get region list
-        regions = boto3.client('ec2',
-                               aws_access_key_id=creds['AccessKeyId'],
-                               aws_secret_access_key=creds['SecretAccessKey'],
-                               aws_session_token=creds['SessionToken']
-                               ).describe_regions()
+        try:
+            regions = boto3.client('ec2',
+                                   aws_access_key_id=creds['AccessKeyId'],
+                                   aws_secret_access_key=creds['SecretAccessKey'],
+                                   aws_session_token=creds['SessionToken']
+                                   ).describe_regions()
+        except NoRegionError:
+            regions = boto3.client('ec2',
+                                   aws_access_key_id=creds['AccessKeyId'],
+                                   aws_secret_access_key=creds['SecretAccessKey'],
+                                   aws_session_token=creds['SessionToken'],
+                                   region_name='us-east-1'
+                                   ).describe_regions()
 
         # generate results
         for region in regions['Regions']:
