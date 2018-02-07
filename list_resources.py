@@ -26,7 +26,7 @@ def count_ec2_instances(sts_creds, region):
                               aws_session_token=sts_creds['SessionToken'],
                               region_name=region)
 
-    response = ec2_client.describe_instances(MaxResults=10)
+    response = ec2_client.describe_instances()
     instance_count = sum(len(r['Instances']) for r in response['Reservations'])
     while 'NextToken' in response:
         logger.debug('EC2 pagination detected, getting more results')
