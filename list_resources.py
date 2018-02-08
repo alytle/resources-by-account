@@ -19,7 +19,7 @@ def setup_logger():
     logger.addHandler(ch)
 
 
-def count_ec2_instances(sts_creds, region):
+def count_ec2_instances(sts_creds, region, options):
 
     ec2_client = boto3.client('ec2',
                               aws_access_key_id=sts_creds['AccessKeyId'],
@@ -27,7 +27,13 @@ def count_ec2_instances(sts_creds, region):
                               aws_session_token=sts_creds['SessionToken'],
                               region_name=region)
 
-    response = ec2_client.describe_instances()
+    filters = []
+    if options['status'] == 'running':
+        filters.append(
+            {'Name': 'instance-state-name',
+            'Values': ['pending', 'running']})
+
+    response = ec2_client.describe_instances(Filters=filters)
     instance_count = sum(len(r['Instances']) for r in response['Reservations'])
     while 'NextToken' in response:
         logger.debug('EC2 pagination detected, getting more results')
@@ -37,7 +43,7 @@ def count_ec2_instances(sts_creds, region):
     return instance_count
 
 
-def count_rds_instances(sts_creds, region):
+def count_rds_instances(sts_creds, region, options):
 
     rds_client = boto3.client('rds',
                               aws_access_key_id=sts_creds['AccessKeyId'],
@@ -90,6 +96,8 @@ def main():
     parser.add_argument('--debug', action='store_true', help='enable debug logging')
     parser.add_argument('-o', '--output', action='store', required=True, help='csv filename to write output results')
     parser.add_argument('-r', '--rolename', action='store', required=True, help='role name to assume in each account')
+    parser.add_argument('--status', action='store', choices=['running', 'all'], default='all')
+
     args = parser.parse_args()
 
     # debug logging
@@ -100,6 +108,10 @@ def main():
     organizations_client = boto3.client('organizations')
     response = organizations_client.list_accounts()
     accounts = response['Accounts']
+
+    options = {
+        "status": args.status
+    }
 
     # store results here
     results = {
@@ -144,7 +156,7 @@ def main():
 
             # get ec2 numbers
             try:
-                ec2_resource_count = count_ec2_instances(creds, region_name)
+                ec2_resource_count = count_ec2_instances(creds, region_name, options)
                 results['ec2'][account_id][region_name] = ec2_resource_count
                 logger.info('Total [{}] EC2 instances for account [{}] in region [{}]'.format(ec2_resource_count, account_id, region_name))
             except ClientError as e:
@@ -152,7 +164,7 @@ def main():
 
             # get rds numbers
             try:
-                rds_resource_count = count_rds_instances(creds, region['RegionName'])
+                rds_resource_count = count_rds_instances(creds, region['RegionName'], options)
                 results['rds'][account_id][region_name] = rds_resource_count
                 logger.info('Total [{}] RDS instances for account [{}] in region [{}]'.format(rds_resource_count, account_id, region_name))
             except ClientError as e:
